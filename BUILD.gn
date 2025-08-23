@@ -1,0 +1,406 @@
+# RustixOS GN Build Configuration
+# Professional build system using Google's GN
+
+import("//build/config/rustix_config.gni")
+import("//build/rust.gni")
+
+# Global configuration
+config("rustix_config") {
+  defines = [
+    "RUSTIX_VERSION=\"0.1.0\"",
+    "RUSTIX_ARCH=\"$target_cpu\"",
+  ]
+  
+  if (is_debug) {
+    defines += [ "RUSTIX_DEBUG=1" ]
+  }
+  
+  cflags = [
+    "-nostdlib",
+    "-nostartfiles",
+    "-ffreestanding",
+    "-fno-stack-protector",
+    "-fno-pic",
+    "-mno-red-zone",
+  ]
+  
+  if (target_cpu == "x64") {
+    cflags += [
+      "-mcmodel=kernel",
+      "-mno-sse",
+      "-mno-mmx",
+    ]
+  } else if (target_cpu == "arm64") {
+    cflags += [
+      "-mcmodel=large",
+      "-mgeneral-regs-only",
+    ]
+  } else if (target_cpu == "arm") {
+    cflags += [
+      "-marm",
+      "-mno-thumb-interwork",
+    ]
+  }
+  
+  ldflags = [
+    "-nostdlib",
+    "-static",
+  ]
+}
+
+# Kernel target
+rust_static_library("kernel") {
+  crate_name = "rustix_kernel"
+  crate_root = "src/main.rs"
+  edition = "2021"
+  
+  features = [
+    "kernel",
+  ]
+  
+  deps = [
+    "//third_party/rust/spin",
+    "//third_party/rust/x86_64",
+    "//third_party/rust/bootloader",
+    "//third_party/rust/uart_16550",
+    "//third_party/rust/pic8259",
+    "//third_party/rust/pc_keyboard",
+    "//third_party/rust/linked_list_allocator",
+    "//third_party/rust/lazy_static",
+    "//third_party/rust/volatile",
+    "//third_party/rust/conquer_once",
+    "//third_party/rust/crossbeam_queue",
+    "//third_party/rust/futures_util",
+  ]
+  
+  configs += [ ":rustix_config" ]
+  
+  sources = [
+    "src/main.rs",
+    "src/vga_buffer.rs",
+    "src/serial.rs",
+    "src/interrupts.rs",
+    "src/gdt.rs",
+    "src/memory.rs",
+    "src/allocator.rs",
+    "src/task/mod.rs",
+    "src/task/simple_executor.rs",
+    "src/task/keyboard.rs",
+    "src/task/executor.rs",
+    "src/keyboard.rs",
+    "src/filesystem.rs",
+    "src/process.rs",
+    "src/syscalls.rs",
+    "src/arch/mod.rs",
+  ]
+  
+  if (target_cpu == "x64") {
+    sources += [
+      "src/arch/x86_64/mod.rs",
+      "src/arch/x86_64/interrupts.rs",
+      "src/arch/x86_64/memory.rs",
+      "src/arch/x86_64/gdt.rs",
+      "src/arch/x86_64/cpu.rs",
+    ]
+  } else if (target_cpu == "x86") {
+    sources += [
+      "src/arch/x86/mod.rs",
+    ]
+  } else if (target_cpu == "arm") {
+    sources += [
+      "src/arch/arm/mod.rs",
+    ]
+  } else if (target_cpu == "arm64") {
+    sources += [
+      "src/arch/aarch64/mod.rs",
+    ]
+  }
+}
+
+# Assembly sources
+if (target_cpu == "x64") {
+  source_set("asm_x86_64") {
+    sources = [
+      "src/arch/x86_64/boot.s",
+      "src/arch/x86_64/interrupt.s",
+      "src/arch/x86_64/context_switch.s",
+    ]
+    
+    configs += [ ":rustix_config" ]
+  }
+} else if (target_cpu == "x86") {
+  source_set("asm_x86") {
+    sources = [
+      "src/arch/x86/boot.s",
+      "src/arch/x86/interrupt.s",
+      "src/arch/x86/context_switch.s",
+    ]
+    
+    configs += [ ":rustix_config" ]
+  }
+} else if (target_cpu == "arm") {
+  source_set("asm_arm") {
+    sources = [
+      "src/arch/arm/boot.s",
+      "src/arch/arm/vectors.s",
+      "src/arch/arm/context_switch.s",
+    ]
+    
+    configs += [ ":rustix_config" ]
+  }
+} else if (target_cpu == "arm64") {
+  source_set("asm_aarch64") {
+    sources = [
+      "src/arch/aarch64/boot.s",
+      "src/arch/aarch64/vectors.s",
+      "src/arch/aarch64/context_switch.s",
+    ]
+    
+    configs += [ ":rustix_config" ]
+  }
+}
+
+# Device drivers
+group("drivers") {
+  deps = [
+    "//drivers/keyboard",
+    "//drivers/display",
+    "//drivers/storage",
+    "//drivers/network",
+    "//drivers/usb",
+    "//drivers/pci",
+  ]
+}
+
+# Filesystem implementations
+group("filesystems") {
+  deps = [
+    "//fs/ext2",
+    "//fs/fat32",
+    "//fs/tmpfs",
+    "//fs/procfs",
+    "//fs/sysfs",
+  ]
+}
+
+# Network stack
+group("network") {
+  deps = [
+    "//net/ethernet",
+    "//net/ip",
+    "//net/tcp",
+    "//net/udp",
+    "//net/socket",
+  ]
+}
+
+# User space programs
+group("userspace") {
+  deps = [
+    "//userspace/shell",
+    "//userspace/init",
+    "//userspace/coreutils",
+    "//userspace/tests",
+  ]
+}
+
+# Kernel executable
+executable("rustix_kernel") {
+  output_name = "kernel"
+  
+  deps = [
+    ":kernel",
+  ]
+  
+  if (target_cpu == "x64") {
+    deps += [ ":asm_x86_64" ]
+    ldflags = [ "-T", rebase_path("src/arch/x86_64/linker.ld", root_build_dir) ]
+  } else if (target_cpu == "x86") {
+    deps += [ ":asm_x86" ]
+    ldflags = [ "-T", rebase_path("src/arch/x86/linker.ld", root_build_dir) ]
+  } else if (target_cpu == "arm") {
+    deps += [ ":asm_arm" ]
+    ldflags = [ "-T", rebase_path("src/arch/arm/linker.ld", root_build_dir) ]
+  } else if (target_cpu == "arm64") {
+    deps += [ ":asm_aarch64" ]
+    ldflags = [ "-T", rebase_path("src/arch/aarch64/linker.ld", root_build_dir) ]
+  }
+  
+  configs += [ ":rustix_config" ]
+}
+
+# ISO image creation
+action("iso") {
+  script = "//build/create_iso.py"
+  
+  inputs = [
+    "$root_build_dir/kernel",
+    "//boot/grub.cfg",
+  ]
+  
+  outputs = [
+    "$root_build_dir/rustix.iso",
+  ]
+  
+  args = [
+    "--kernel", rebase_path("$root_build_dir/kernel", root_build_dir),
+    "--grub-cfg", rebase_path("//boot/grub.cfg", root_build_dir),
+    "--output", rebase_path("$root_build_dir/rustix.iso", root_build_dir),
+  ]
+  
+  deps = [ ":rustix_kernel" ]
+}
+
+# QEMU run targets
+action("run") {
+  script = "//build/run_qemu.py"
+  
+  inputs = [
+    "$root_build_dir/kernel",
+  ]
+  
+  outputs = [
+    "$root_build_dir/qemu.log",
+  ]
+  
+  args = [
+    "--kernel", rebase_path("$root_build_dir/kernel", root_build_dir),
+    "--arch", target_cpu,
+    "--log", rebase_path("$root_build_dir/qemu.log", root_build_dir),
+  ]
+  
+  deps = [ ":rustix_kernel" ]
+}
+
+action("run_iso") {
+  script = "//build/run_qemu.py"
+  
+  inputs = [
+    "$root_build_dir/rustix.iso",
+  ]
+  
+  outputs = [
+    "$root_build_dir/qemu_iso.log",
+  ]
+  
+  args = [
+    "--iso", rebase_path("$root_build_dir/rustix.iso", root_build_dir),
+    "--arch", target_cpu,
+    "--log", rebase_path("$root_build_dir/qemu_iso.log", root_build_dir),
+  ]
+  
+  deps = [ ":iso" ]
+}
+
+# Debug target
+action("debug") {
+  script = "//build/debug_qemu.py"
+  
+  inputs = [
+    "$root_build_dir/kernel",
+  ]
+  
+  outputs = [
+    "$root_build_dir/debug.log",
+  ]
+  
+  args = [
+    "--kernel", rebase_path("$root_build_dir/kernel", root_build_dir),
+    "--arch", target_cpu,
+    "--log", rebase_path("$root_build_dir/debug.log", root_build_dir),
+  ]
+  
+  deps = [ ":rustix_kernel" ]
+}
+
+# Test targets
+rust_test("kernel_tests") {
+  crate_root = "src/main.rs"
+  
+  deps = [
+    "//third_party/rust/spin",
+    "//third_party/rust/x86_64",
+    "//third_party/rust/bootloader",
+  ]
+  
+  configs += [ ":rustix_config" ]
+}
+
+group("tests") {
+  testonly = true
+  
+  deps = [
+    ":kernel_tests",
+    "//tests/integration:all",
+    "//tests/unit:all",
+  ]
+}
+
+# Documentation
+action("docs") {
+  script = "//build/generate_docs.py"
+  
+  inputs = [
+    "src/main.rs",
+  ]
+  
+  outputs = [
+    "$root_build_dir/docs/index.html",
+  ]
+  
+  args = [
+    "--source-dir", rebase_path("src", root_build_dir),
+    "--output-dir", rebase_path("$root_build_dir/docs", root_build_dir),
+  ]
+}
+
+# Formatting and linting
+action("format") {
+  script = "//build/format.py"
+  
+  inputs = [
+    "src/main.rs",
+  ]
+  
+  outputs = [
+    "$root_build_dir/format.stamp",
+  ]
+  
+  args = [
+    "--source-dir", rebase_path(".", root_build_dir),
+    "--stamp", rebase_path("$root_build_dir/format.stamp", root_build_dir),
+  ]
+}
+
+action("clippy") {
+  script = "//build/clippy.py"
+  
+  inputs = [
+    "src/main.rs",
+  ]
+  
+  outputs = [
+    "$root_build_dir/clippy.stamp",
+  ]
+  
+  args = [
+    "--source-dir", rebase_path(".", root_build_dir),
+    "--stamp", rebase_path("$root_build_dir/clippy.stamp", root_build_dir),
+  ]
+}
+
+# All target
+group("all") {
+  deps = [
+    ":rustix_kernel",
+    ":drivers",
+    ":filesystems",
+    ":network",
+    ":userspace",
+  ]
+}
+
+# Default target
+group("default") {
+  deps = [ ":rustix_kernel" ]
+}

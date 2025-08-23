@@ -1,0 +1,240 @@
+# RustixOS Build Configuration
+# Global configuration variables and settings
+
+# Version information
+rustix_version_major = 0
+rustix_version_minor = 1
+rustix_version_patch = 0
+rustix_version_string = "$rustix_version_major.$rustix_version_minor.$rustix_version_patch"
+
+# Build configuration
+declare_args() {
+  # Target architecture
+  target_arch = "x86_64"
+  
+  # Build mode
+  is_debug = true
+  is_release = false
+  
+  # Feature flags
+  enable_smp = true
+  enable_virtualization = true
+  enable_security_features = true
+  enable_networking = true
+  enable_usb = true
+  enable_acpi = true
+  enable_uefi = true
+  
+  # Memory configuration
+  kernel_heap_size = 1048576  # 1MB
+  kernel_stack_size = 16384   # 16KB
+  user_stack_size = 65536     # 64KB
+  
+  # Scheduler configuration
+  scheduler_time_slice_ms = 10
+  scheduler_priority_levels = 32
+  
+  # Filesystem configuration
+  max_open_files = 1024
+  max_file_size = 1073741824  # 1GB
+  
+  # Network configuration
+  max_network_connections = 256
+  network_buffer_size = 65536  # 64KB
+  
+  # Security configuration
+  enable_stack_protection = true
+  enable_aslr = true
+  enable_smep = true  # Supervisor Mode Execution Prevention
+  enable_smap = true  # Supervisor Mode Access Prevention
+  
+  # Development options
+  enable_debug_symbols = true
+  enable_profiling = false
+  enable_coverage = false
+  enable_sanitizers = false
+  
+  # Optimization level
+  optimization_level = "2"  # -O2
+  
+  # Cross-compilation toolchain
+  use_custom_toolchain = false
+  toolchain_prefix = ""
+}
+
+# Derived configuration
+if (is_release) {
+  is_debug = false
+}
+
+# Architecture-specific configuration
+if (target_arch == "x86_64") {
+  target_cpu = "x64"
+  kernel_virtual_base = "0xFFFFFFFF80000000"
+  user_virtual_base = "0x0000000000400000"
+  page_size = 4096
+} else if (target_arch == "x86") {
+  target_cpu = "x86"
+  kernel_virtual_base = "0xC0000000"
+  user_virtual_base = "0x08048000"
+  page_size = 4096
+} else if (target_arch == "arm") {
+  target_cpu = "arm"
+  kernel_virtual_base = "0xC0000000"
+  user_virtual_base = "0x00008000"
+  page_size = 4096
+} else if (target_arch == "aarch64") {
+  target_cpu = "arm64"
+  kernel_virtual_base = "0xFFFFFFFF80000000"
+  user_virtual_base = "0x0000000000400000"
+  page_size = 4096
+}
+
+# Toolchain configuration
+if (use_custom_toolchain) {
+  if (target_arch == "x86_64") {
+    toolchain_prefix = "x86_64-elf-"
+  } else if (target_arch == "x86") {
+    toolchain_prefix = "i686-elf-"
+  } else if (target_arch == "arm") {
+    toolchain_prefix = "arm-none-eabi-"
+  } else if (target_arch == "aarch64") {
+    toolchain_prefix = "aarch64-none-elf-"
+  }
+}
+
+# Compiler flags
+common_cflags = [
+  "-Wall",
+  "-Wextra",
+  "-Werror",
+  "-nostdlib",
+  "-nostartfiles",
+  "-ffreestanding",
+  "-fno-stack-protector",
+  "-fno-pic",
+]
+
+if (enable_stack_protection && target_arch != "arm") {
+  common_cflags += [ "-fstack-protector-strong" ]
+}
+
+if (is_debug) {
+  common_cflags += [
+    "-g",
+    "-DDEBUG=1",
+    "-O0",
+  ]
+} else {
+  common_cflags += [
+    "-O$optimization_level",
+    "-DNDEBUG=1",
+  ]
+  
+  if (optimization_level == "s" || optimization_level == "z") {
+    common_cflags += [ "-ffunction-sections", "-fdata-sections" ]
+  }
+}
+
+# Architecture-specific compiler flags
+arch_cflags = []
+if (target_arch == "x86_64") {
+  arch_cflags = [
+    "-mcmodel=kernel",
+    "-mno-red-zone",
+    "-mno-sse",
+    "-mno-mmx",
+  ]
+} else if (target_arch == "x86") {
+  arch_cflags = [
+    "-m32",
+    "-march=i686",
+  ]
+} else if (target_arch == "arm") {
+  arch_cflags = [
+    "-marm",
+    "-mcpu=cortex-a15",
+    "-mfpu=neon",
+    "-mfloat-abi=hard",
+  ]
+} else if (target_arch == "aarch64") {
+  arch_cflags = [
+    "-mcmodel=large",
+    "-mgeneral-regs-only",
+  ]
+}
+
+# Linker flags
+common_ldflags = [
+  "-nostdlib",
+  "-static",
+]
+
+if (is_release && (optimization_level == "s" || optimization_level == "z")) {
+  common_ldflags += [ "-Wl,--gc-sections" ]
+}
+
+# Rust configuration
+rust_edition = "2021"
+rust_features = [
+  "kernel",
+]
+
+if (enable_smp) {
+  rust_features += [ "smp" ]
+}
+
+if (enable_virtualization) {
+  rust_features += [ "virtualization" ]
+}
+
+if (enable_security_features) {
+  rust_features += [ "security" ]
+}
+
+if (enable_networking) {
+  rust_features += [ "networking" ]
+}
+
+# Test configuration
+test_timeout_seconds = 300
+test_qemu_memory = "512M"
+
+# QEMU configuration
+qemu_common_args = [
+  "-serial", "stdio",
+  "-no-reboot",
+  "-no-shutdown",
+]
+
+if (target_arch == "x86_64") {
+  qemu_binary = "qemu-system-x86_64"
+  qemu_machine = "q35"
+  qemu_cpu = "qemu64"
+} else if (target_arch == "x86") {
+  qemu_binary = "qemu-system-i386"
+  qemu_machine = "pc"
+  qemu_cpu = "pentium3"
+} else if (target_arch == "arm") {
+  qemu_binary = "qemu-system-arm"
+  qemu_machine = "vexpress-a15"
+  qemu_cpu = "cortex-a15"
+} else if (target_arch == "aarch64") {
+  qemu_binary = "qemu-system-aarch64"
+  qemu_machine = "virt"
+  qemu_cpu = "cortex-a57"
+}
+
+# Documentation configuration
+doc_output_format = "html"
+doc_include_private = false
+doc_include_examples = true
+
+# Formatting configuration
+rust_fmt_config = "rustfmt.toml"
+clang_format_style = "Google"
+
+# Static analysis configuration
+clippy_config = "clippy.toml"
+enable_clippy_pedantic = true
+enable_clippy_nursery = false

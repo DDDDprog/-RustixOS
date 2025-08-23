@@ -1,0 +1,395 @@
+# Rust build rules for RustixOS
+# Professional Rust build system integration
+
+import("//build/config/rustix_config.gni")
+
+# Rust static library template
+template("rust_static_library") {
+  assert(defined(invoker.crate_name), "crate_name must be defined")
+  assert(defined(invoker.crate_root), "crate_root must be defined")
+  
+  action(target_name) {
+    forward_variables_from(invoker, [
+      "deps",
+      "public_deps",
+      "data_deps",
+      "sources",
+      "inputs",
+      "visibility",
+      "testonly",
+    ])
+    
+    crate_name = invoker.crate_name
+    crate_root = invoker.crate_root
+    
+    if (defined(invoker.edition)) {
+      edition = invoker.edition
+    } else {
+      edition = rust_edition
+    }
+    
+    if (defined(invoker.features)) {
+      features = invoker.features
+    } else {
+      features = []
+    }
+    
+    if (defined(invoker.cfg)) {
+      cfg = invoker.cfg
+    } else {
+      cfg = []
+    }
+    
+    # Output file
+    output_name = crate_name
+    if (defined(invoker.output_name)) {
+      output_name = invoker.output_name
+    }
+    
+    output_file = "$target_out_dir/lib$output_name.rlib"
+    outputs = [ output_file ]
+    
+    # Build script
+    script = "//build/scripts/build_rust.py"
+    
+    # Arguments
+    args = [
+      "--crate-name", crate_name,
+      "--crate-root", rebase_path(crate_root, root_build_dir),
+      "--output", rebase_path(output_file, root_build_dir),
+      "--edition", edition,
+      "--target", target_cpu,
+      "--crate-type", "staticlib",
+    ]
+    
+    if (is_debug) {
+      args += [ "--debug" ]
+    } else {
+      args += [ "--release" ]
+    }
+    
+    foreach(feature, features) {
+      args += [ "--feature", feature ]
+    }
+    
+    foreach(config, cfg) {
+      args += [ "--cfg", config ]
+    }
+    
+    if (defined(invoker.rustc_flags)) {
+      foreach(flag, invoker.rustc_flags) {
+        args += [ "--rustc-flag", flag ]
+      }
+    }
+    
+    # Dependencies
+    if (defined(deps)) {
+      foreach(dep, deps) {
+        args += [ "--dep", dep ]
+      }
+    }
+    
+    # Environment variables
+    if (defined(invoker.rustc_env)) {
+      foreach(env_var, invoker.rustc_env) {
+        args += [ "--env", env_var ]
+      }
+    }
+  }
+}
+
+# Rust executable template
+template("rust_executable") {
+  assert(defined(invoker.crate_name), "crate_name must be defined")
+  assert(defined(invoker.crate_root), "crate_root must be defined")
+  
+  action(target_name) {
+    forward_variables_from(invoker, [
+      "deps",
+      "public_deps", 
+      "data_deps",
+      "sources",
+      "inputs",
+      "visibility",
+      "testonly",
+    ])
+    
+    crate_name = invoker.crate_name
+    crate_root = invoker.crate_root
+    
+    if (defined(invoker.edition)) {
+      edition = invoker.edition
+    } else {
+      edition = rust_edition
+    }
+    
+    if (defined(invoker.features)) {
+      features = invoker.features
+    } else {
+      features = []
+    }
+    
+    # Output file
+    output_name = crate_name
+    if (defined(invoker.output_name)) {
+      output_name = invoker.output_name
+    }
+    
+    output_file = "$target_out_dir/$output_name"
+    outputs = [ output_file ]
+    
+    # Build script
+    script = "//build/scripts/build_rust.py"
+    
+    # Arguments
+    args = [
+      "--crate-name", crate_name,
+      "--crate-root", rebase_path(crate_root, root_build_dir),
+      "--output", rebase_path(output_file, root_build_dir),
+      "--edition", edition,
+      "--target", target_cpu,
+      "--crate-type", "bin",
+    ]
+    
+    if (is_debug) {
+      args += [ "--debug" ]
+    } else {
+      args += [ "--release" ]
+    }
+    
+    foreach(feature, features) {
+      args += [ "--feature", feature ]
+    }
+    
+    # Dependencies
+    if (defined(deps)) {
+      foreach(dep, deps) {
+        args += [ "--dep", dep ]
+      }
+    }
+  }
+}
+
+# Rust test template
+template("rust_test") {
+  assert(defined(invoker.crate_root), "crate_root must be defined")
+  
+  action(target_name) {
+    forward_variables_from(invoker, [
+      "deps",
+      "public_deps",
+      "data_deps", 
+      "sources",
+      "inputs",
+      "visibility",
+    ])
+    
+    testonly = true
+    
+    crate_root = invoker.crate_root
+    
+    if (defined(invoker.crate_name)) {
+      crate_name = invoker.crate_name
+    } else {
+      crate_name = target_name
+    }
+    
+    if (defined(invoker.edition)) {
+      edition = invoker.edition
+    } else {
+      edition = rust_edition
+    }
+    
+    # Output file
+    output_file = "$target_out_dir/${crate_name}_test"
+    outputs = [ output_file ]
+    
+    # Build script
+    script = "//build/scripts/build_rust_test.py"
+    
+    # Arguments
+    args = [
+      "--crate-name", crate_name,
+      "--crate-root", rebase_path(crate_root, root_build_dir),
+      "--output", rebase_path(output_file, root_build_dir),
+      "--edition", edition,
+      "--target", target_cpu,
+    ]
+    
+    if (defined(invoker.features)) {
+      foreach(feature, invoker.features) {
+        args += [ "--feature", feature ]
+      }
+    }
+    
+    # Dependencies
+    if (defined(deps)) {
+      foreach(dep, deps) {
+        args += [ "--dep", dep ]
+      }
+    }
+  }
+}
+
+# Rust benchmark template
+template("rust_benchmark") {
+  assert(defined(invoker.crate_root), "crate_root must be defined")
+  
+  action(target_name) {
+    forward_variables_from(invoker, [
+      "deps",
+      "public_deps",
+      "data_deps",
+      "sources", 
+      "inputs",
+      "visibility",
+    ])
+    
+    testonly = true
+    
+    crate_root = invoker.crate_root
+    
+    if (defined(invoker.crate_name)) {
+      crate_name = invoker.crate_name
+    } else {
+      crate_name = target_name
+    }
+    
+    # Output file
+    output_file = "$target_out_dir/${crate_name}_bench"
+    outputs = [ output_file ]
+    
+    # Build script
+    script = "//build/scripts/build_rust_bench.py"
+    
+    # Arguments
+    args = [
+      "--crate-name", crate_name,
+      "--crate-root", rebase_path(crate_root, root_build_dir),
+      "--output", rebase_path(output_file, root_build_dir),
+      "--target", target_cpu,
+    ]
+    
+    # Dependencies
+    if (defined(deps)) {
+      foreach(dep, deps) {
+        args += [ "--dep", dep ]
+      }
+    }
+  }
+}
+
+# Rust procedural macro template
+template("rust_proc_macro") {
+  assert(defined(invoker.crate_name), "crate_name must be defined")
+  assert(defined(invoker.crate_root), "crate_root must be defined")
+  
+  rust_static_library(target_name) {
+    forward_variables_from(invoker, "*")
+    
+    if (!defined(rustc_flags)) {
+      rustc_flags = []
+    }
+    rustc_flags += [ "--crate-type=proc-macro" ]
+  }
+}
+
+# Cargo workspace template
+template("cargo_workspace") {
+  assert(defined(invoker.manifest_path), "manifest_path must be defined")
+  
+  action(target_name) {
+    forward_variables_from(invoker, [
+      "deps",
+      "visibility",
+      "testonly",
+    ])
+    
+    manifest_path = invoker.manifest_path
+    
+    if (defined(invoker.package)) {
+      package = invoker.package
+    } else {
+      package = ""
+    }
+    
+    # Output directory
+    output_dir = "$target_out_dir/cargo"
+    outputs = [ "$output_dir/.stamp" ]
+    
+    # Build script
+    script = "//build/scripts/build_cargo.py"
+    
+    # Arguments
+    args = [
+      "--manifest-path", rebase_path(manifest_path, root_build_dir),
+      "--output-dir", rebase_path(output_dir, root_build_dir),
+      "--target", target_cpu,
+    ]
+    
+    if (package != "") {
+      args += [ "--package", package ]
+    }
+    
+    if (is_debug) {
+      args += [ "--debug" ]
+    } else {
+      args += [ "--release" ]
+    }
+    
+    if (defined(invoker.features)) {
+      foreach(feature, invoker.features) {
+        args += [ "--feature", feature ]
+      }
+    }
+  }
+}
+
+# Rust documentation template
+template("rust_doc") {
+  assert(defined(invoker.crate_root), "crate_root must be defined")
+  
+  action(target_name) {
+    forward_variables_from(invoker, [
+      "deps",
+      "sources",
+      "inputs",
+      "visibility",
+    ])
+    
+    crate_root = invoker.crate_root
+    
+    if (defined(invoker.crate_name)) {
+      crate_name = invoker.crate_name
+    } else {
+      crate_name = target_name
+    }
+    
+    # Output directory
+    output_dir = "$target_out_dir/doc"
+    outputs = [ "$output_dir/index.html" ]
+    
+    # Build script
+    script = "//build/scripts/build_rust_doc.py"
+    
+    # Arguments
+    args = [
+      "--crate-name", crate_name,
+      "--crate-root", rebase_path(crate_root, root_build_dir),
+      "--output-dir", rebase_path(output_dir, root_build_dir),
+    ]
+    
+    if (defined(invoker.features)) {
+      foreach(feature, invoker.features) {
+        args += [ "--feature", feature ]
+      }
+    }
+    
+    # Dependencies
+    if (defined(deps)) {
+      foreach(dep, deps) {
+        args += [ "--dep", dep ]
+      }
+    }
+  }
+}
