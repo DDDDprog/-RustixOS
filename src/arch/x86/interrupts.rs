@@ -68,7 +68,7 @@ extern "x86-interrupt" fn divide_error_handler(_stack_frame: InterruptStackFrame
 }
 
 extern "x86-interrupt" fn debug_handler(_stack_frame: InterruptStackFrame) {
-    println!("DEBUG");
+    // Debug print removed
 }
 
 extern "x86-interrupt" fn nmi_handler(_stack_frame: InterruptStackFrame) {
