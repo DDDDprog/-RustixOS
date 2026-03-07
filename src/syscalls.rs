@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use crate::{filesystem::FILESYSTEM, process::PROCESS_MANAGER};
 use alloc::{string::String, vec::Vec};
 use x86_64::VirtAddr;

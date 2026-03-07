@@ -1,6 +1,5 @@
 //! Minimal bootloader API stubs for building without the full bootloader crate
 
-#![no_std]
 
 extern crate alloc;
 
