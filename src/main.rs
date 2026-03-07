@@ -18,27 +18,26 @@ use core::panic::PanicInfo;
 mod vga_buffer;
 mod serial;
 #[cfg(target_arch = "x86_64")]
-#[cfg(target_arch = "x86_64")]
 mod interrupts;
 #[cfg(not(target_arch = "x86_64"))]
 mod interrupts_stub as interrupts;
-#[cfg(target_arch = "x86_64")]
 #[cfg(target_arch = "x86_64")]
 mod gdt;
 #[cfg(not(target_arch = "x86_64"))]
 mod gdt_stub as gdt;
 #[cfg(target_arch = "x86_64")]
-#[cfg(target_arch = "x86_64")]
 mod memory;
 #[cfg(not(target_arch = "x86_64"))]
 mod memory_stub as memory;
-#[cfg(target_arch = "x86_64")]
-mod keyboard;
-
 mod allocator;
 mod task;
+#[cfg(target_arch = "x86_64")]
+mod keyboard;
+#[cfg(target_arch = "x86_64")]
 mod filesystem;
+#[cfg(target_arch = "x86_64")]
 mod process;
+#[cfg(target_arch = "x86_64")]
 mod syscalls;
 
 entry_point!(kernel_main);
@@ -46,13 +45,13 @@ entry_point!(kernel_main);
 fn kernel_main(_boot_info: *const Multiboot) -> ! {
     // Use early boot print before any initialization
     boot::early_print("RustixOS v0.1.0 - Booting...\n");
-
+    
     #[cfg(target_arch = "x86_64")]
     {
         // Initialize GDT first (required for any segment operations)
         gdt::init();
         boot::early_print("GDT OK\n");
-
+        
         // Initialize interrupts
         interrupts::init_idt();
         boot::early_print("IDT OK\n");
@@ -64,10 +63,11 @@ fn kernel_main(_boot_info: *const Multiboot) -> ! {
         println!("RustixOS - Advanced Rust Kernel v0.1.0");
         println!("========================================");
 
+
         // Initialize memory management with default values
         let phys_mem_offset = x86_64::VirtAddr::new(0xFFFF_FFE0_0000_0000);
         let mut mapper = unsafe { memory::init(phys_mem_offset) };
-
+        
         // Create frame allocator using default memory map
         let mut frame_allocator = unsafe {
             memory::BootInfoFrameAllocator::init_default()
@@ -77,33 +77,50 @@ fn kernel_main(_boot_info: *const Multiboot) -> ! {
         allocator::init_heap(&mut mapper, &mut frame_allocator)
             .expect("heap initialization failed");
         println!("Heap initialized");
+
+        // Initialize filesystem
+        filesystem::init();
+        println!("Filesystem initialized");
+
+        // Initialize process management
+        process::init();
+        println!("Process initialized");
+
+        // Initialize system calls
+        syscalls::init();
+        println!("Syscalls initialized");
     }
 
     #[cfg(not(target_arch = "x86_64"))]
     {
-        println!("RustixOS v0.1.0 - Architecture stub");
-        boot::early_print("Non-x86_64: stub only\n");
+        println!("RustixOS - Non-x86_64 Architecture");
+        println!("Basic initialization complete");
     }
-
-    // Initialize filesystem
-    filesystem::init();
-    println!("Filesystem initialized");
-
-    // Initialize process management
-    process::init();
-    println!("Process initialized");
-
-    // Initialize system calls
-    syscalls::init();
-    println!("Syscalls initialized");
 
     println!("Kernel initialization complete!");
     println!("Starting kernel loop...");
-
+    
     // Start the main kernel loop
     kernel_loop();
 }
+
+#[cfg(target_arch = "x86_64")]
+fn kernel_loop() -> ! {
+    println!("Kernel running...");
+    
+    // Simple idle loop
+    loop {
         x86_64::instructions::hlt();
+    }
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn kernel_loop() -> ! {
+    println!("Kernel running (non-x86_64)...");
+    
+    // Simple idle loop
+    loop {
+        core::arch::asm!("wfi");
     }
 }
 
@@ -124,6 +141,14 @@ fn panic(info: &PanicInfo) -> ! {
     hlt_loop();
 }
 
+#[cfg(not(test))]
+#[cfg(not(target_arch = "x86_64"))]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("PANIC: {}", info);
+    loop {}
+}
+
 #[cfg(test)]
 #[cfg(target_arch = "x86_64")]
 #[panic_handler]
@@ -134,6 +159,7 @@ fn panic(info: &PanicInfo) -> ! {
     hlt_loop();
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
@@ -168,13 +194,4 @@ fn test_runner(tests: &[&dyn Fn()]) {
 #[test_case]
 fn trivial_assertion() {
     assert_eq!(1, 1);
-}
-
-// Fallback panic handler for non-x86_64 architectures
-#[cfg(not(target_arch = "x86_64"))]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    loop {
-        unsafe { core::arch::asm!("wfi") };
-    }
 }
