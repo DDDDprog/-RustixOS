@@ -15,15 +15,14 @@ SUPPORTED_ARCHS := x86_64 x86 arm aarch64
 
 # Build configuration
 BUILD_MODE ?= debug
-RUST_TARGET_x86_64 := x86_64-rustix.json
-RUST_TARGET_x86 := i686-rustix.json
-RUST_TARGET_arm := armv7-rustix.json
-RUST_TARGET_aarch64 := aarch64-rustix.json
+RUST_TARGET_x86_64 := x86_64-unknown-none
+RUST_TARGET_x86 := i686-unknown-none
+RUST_TARGET_arm := armv7-unknown-none-gnueabihf
+RUST_TARGET_aarch64 := aarch64-unknown-none
 
 # Toolchain configuration
 RUST_TARGET := $(RUST_TARGET_$(ARCH))
 CARGO_FLAGS := --target $(RUST_TARGET)
-RUSTFLAGS := -C link-arg=-nostartfiles
 
 ifeq ($(BUILD_MODE),release)
     CARGO_FLAGS += --release
@@ -61,22 +60,32 @@ OBJDUMP := $(OBJDUMP_$(ARCH))
 
 # File paths
 KERNEL_BIN := $(TARGET_DIR)/$(RUST_TARGET)/$(TARGET_SUBDIR)/$(PROJECT_NAME)
-KERNEL_ELF := $(BUILD_DIR)/kernel-$(ARCH).elf
+KERNEL_ELF := target/x86_64-unknown-none/debug/kernel
 KERNEL_IMG := $(BUILD_DIR)/kernel-$(ARCH).img
 ISO_FILE := $(BUILD_DIR)/$(PROJECT_NAME)-$(ARCH).iso
 
 # Assembly source files
-ASM_SOURCES_x86_64 := src/arch/x86_64/boot.s src/arch/x86_64/interrupt.s
-ASM_SOURCES_x86 := src/arch/x86/boot.s src/arch/x86/interrupt.s
+ASM_SOURCES_x86_64 := src/boot/multiboot_header.asm src/arch/x86_64/boot.s src/arch/x86_64/interrupt.s
+ASM_SOURCES_x86 := src/boot/multiboot_header.asm src/arch/x86/boot.s src/arch/x86/interrupt.s
 ASM_SOURCES_arm := src/arch/arm/boot.s src/arch/arm/vectors.s
 ASM_SOURCES_aarch64 := src/arch/aarch64/boot.s src/arch/aarch64/vectors.s
 
 ASM_SOURCES := $(ASM_SOURCES_$(ARCH))
-ASM_OBJECTS := $(patsubst src/%.s,$(BUILD_DIR)/%.o,$(ASM_SOURCES))
+ASM_OBJECTS := $(patsubst src/%.asm,target/%.o,$(patsubst src/%.s,target/%.o,$(ASM_SOURCES)))
+
+# Assembly build rules
+target/%.o: src/%.asm | target
+	@$(CC) -c $< -o $@
+
+target/%.o: src/%.s | target
+	@$(CC) -c $< -o $@
+
+target:
+	@mkdir -p target
 
 # Linker scripts
-LINKER_SCRIPT_x86_64 := src/arch/x86_64/linker.ld
-LINKER_SCRIPT_x86 := src/arch/x86/linker.ld
+LINKER_SCRIPT_x86_64 := linker.ld
+LINKER_SCRIPT_x86 := linker.ld
 LINKER_SCRIPT_arm := src/arch/arm/linker.ld
 LINKER_SCRIPT_aarch64 := src/arch/aarch64/linker.ld
 
@@ -180,8 +189,8 @@ $(KERNEL_IMG): $(KERNEL_ELF)
 
 # Main kernel target
 .PHONY: kernel
-kernel: $(KERNEL_ELF)
-	@echo "$(GREEN)Kernel built successfully for $(ARCH)!$(NC)"
+kernel: target/x86_64-unknown-none/debug/kernel
+	@echo "$(GREEN)Kernel built successfully for x86_64!$(NC)"
 	@$(OBJDUMP) -h $< | head -20
 
 # Build for all architectures
