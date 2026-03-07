@@ -42,4 +42,4 @@ uart_16550 = "0.2"
 bootloader = "0.11.15"
 
 [package.metadata.bootloader]
-targets = ["x86_64-unknown-none"]
+target = "x86_64-unknown-none"
