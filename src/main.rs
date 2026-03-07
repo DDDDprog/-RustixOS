@@ -20,15 +20,15 @@ mod serial;
 #[cfg(target_arch = "x86_64")]
 mod interrupts;
 #[cfg(not(target_arch = "x86_64"))]
-mod interrupts_stub as interrupts;
+pub mod interrupts_stub;
 #[cfg(target_arch = "x86_64")]
 mod gdt;
 #[cfg(not(target_arch = "x86_64"))]
-mod gdt_stub as gdt;
+pub mod gdt_stub;
 #[cfg(target_arch = "x86_64")]
 mod memory;
 #[cfg(not(target_arch = "x86_64"))]
-mod memory_stub as memory;
+pub mod memory_stub;
 mod allocator;
 mod task;
 #[cfg(target_arch = "x86_64")]
