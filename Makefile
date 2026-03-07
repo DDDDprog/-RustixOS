@@ -74,7 +74,7 @@ ASM_SOURCES := $(ASM_SOURCES_$(ARCH))
 ASM_OBJECTS := $(patsubst src/%.asm,target/%.o,$(patsubst src/%.s,target/%.o,$(ASM_SOURCES)))
 
 # Assembly build rules
-target/boot/multiboot_header.o: src/boot/multiboot_header.asm | target/boot
+
 	@mkdir -p target/boot
 	@nasm -f elf64 $< -o $@
 
@@ -171,7 +171,7 @@ $(BUILD_DIR):
 
 # Build Rust kernel
 .PHONY: rust-kernel
-rust-kernel: validate-arch target/boot/multiboot_header.o
+rust-kernel: validate-arch
 	@echo "$(BLUE)Building Rust kernel for $(ARCH)...$(NC)"
 	@RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGO_FLAGS)
 
