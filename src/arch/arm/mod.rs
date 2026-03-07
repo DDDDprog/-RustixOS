@@ -347,3 +347,18 @@ impl Timer for ARMTimer {
         // Set timer interrupt callback
     }
 }
+// Re-export submodules
+pub mod interrupts;
+pub mod memory;
+pub mod timer;
+
+// ARM boot initialization
+pub fn init_boot() {
+    // Set up initial stack
+    // This would be provided by the bootloader
+}
+
+// ARM GDT setup (for protected mode)
+pub fn init_gdt() {
+    // ARM doesn't use GDT like x86 - it uses different mechanisms
+}

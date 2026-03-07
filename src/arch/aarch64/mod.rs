@@ -12,6 +12,7 @@ pub mod memory;
 pub mod psci;
 pub mod smp;
 pub mod timer;
+pub mod psci;
 pub mod virtualization;
 pub mod security;
 

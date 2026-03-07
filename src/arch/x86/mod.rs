@@ -317,3 +317,16 @@ pub fn load_gdt(gdt_ptr: &GdtPointer) {
         );
     }
 }
+// Re-export submodules
+pub mod interrupts;
+pub mod memory;
+
+// GDT for x86
+pub fn init_gdt() {
+    // Initialize Global Descriptor Table
+    // This would set up GDT entries for code/data segments
+    unsafe {
+        // Load null descriptor
+        core::arch::asm!("lgdt 0");
+    }
+}
