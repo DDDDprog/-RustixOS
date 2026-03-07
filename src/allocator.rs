@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use alloc::alloc::Layout;
 use linked_list_allocator::LockedHeap;
 use x86_64::{

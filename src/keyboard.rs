@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;

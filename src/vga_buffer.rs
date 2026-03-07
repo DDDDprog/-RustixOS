@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use core::fmt;
 use core::ptr;
 use lazy_static::lazy_static;

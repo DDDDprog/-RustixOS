@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use alloc::{
     collections::{BTreeMap, VecDeque},
     string::String,

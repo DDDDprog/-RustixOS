@@ -20,23 +20,30 @@ mod serial;
 #[cfg(target_arch = "x86_64")]
 mod interrupts;
 #[cfg(not(target_arch = "x86_64"))]
-pub mod interrupts_stub;
+mod interrupts_stub;
 #[cfg(target_arch = "x86_64")]
 mod gdt;
 #[cfg(not(target_arch = "x86_64"))]
-pub mod gdt_stub;
+mod gdt_stub;
 #[cfg(target_arch = "x86_64")]
 mod memory;
 #[cfg(not(target_arch = "x86_64"))]
-pub mod memory_stub;
+mod memory_stub;
+#[cfg(target_arch = "x86_64")]
 mod allocator;
+#[cfg(not(target_arch = "x86_64"))]
+mod allocator_stub;
 mod task;
 #[cfg(target_arch = "x86_64")]
 mod keyboard;
 #[cfg(target_arch = "x86_64")]
 mod filesystem;
+#[cfg(not(target_arch = "x86_64"))]
+mod filesystem_stub;
 #[cfg(target_arch = "x86_64")]
 mod process;
+#[cfg(not(target_arch = "x86_64"))]
+mod process_stub;
 #[cfg(target_arch = "x86_64")]
 mod syscalls;
 

@@ -1,3 +1,4 @@
+#![no_std]
 use alloc::{boxed::Box, sync::Arc};
 use core::{
     future::Future,

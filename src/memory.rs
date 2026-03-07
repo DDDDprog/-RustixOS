@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use x86_64::{
     structures::paging::{
         FrameAllocator, Mapper, Page, PageTable, PhysFrame,

@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use uart_16550::SerialPort;
 use spin::Mutex;
 use lazy_static::lazy_static;

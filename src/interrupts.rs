@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 use crate::{println, print};
 use lazy_static::lazy_static;

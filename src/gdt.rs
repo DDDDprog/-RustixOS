@@ -1,3 +1,4 @@
+#![cfg(target_arch = "x86_64")]
 use x86_64::VirtAddr;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector};
