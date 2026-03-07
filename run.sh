@@ -1,18 +1,11 @@
 #!/bin/bash
 set -e
 
-echo "Building kernel..."
+echo "Building kernel with cargo..."
 cargo build --target x86_64-unknown-none
 
+echo "Creating ISO with GRUB..."
+make iso
+
 echo "Running in QEMU..."
-# Try different boot methods
-qemu-system-x86_64 \
-    -m 256 \
-    -display none \
-    -serial stdio \
-    -cdrom target/x86_64-unknown-none/debug/kernel || \
-qemu-system-x86_64 \
-    -m 256 \
-    -display none \
-    -serial stdio \
-    -kernel target/x86_64-unknown-none/debug/kernel
+make run-iso
