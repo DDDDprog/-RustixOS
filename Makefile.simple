@@ -1,0 +1,19 @@
+# Simple Makefile for RustixOS
+
+.PHONY: all build run clean
+
+all: build
+
+build:
+	cargo build --target x86_64-unknown-none
+
+run: build
+	qemu-system-x86_64 \
+		-m 512M \
+		-kernel target/x86_64-unknown-none/debug/kernel \
+		-append "console=ttyS0" \
+		-display none \
+		-serial stdio
+
+clean:
+	cargo clean
