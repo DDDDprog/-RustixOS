@@ -1,9 +1,10 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc};
 use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+use alloc::task::Wake;
 
 pub mod simple_executor;
 pub mod keyboard;
@@ -53,14 +54,12 @@ impl Waker {
     }
 }
 
-use core::task::Wake;
-
 impl Wake for Waker {
-    fn wake(self: alloc::sync::Arc<Self>) {
+    fn wake(self: Arc<Self>) {
         self.wake_task();
     }
 
-    fn wake_by_ref(self: &alloc::sync::Arc<Self>) {
+    fn wake_by_ref(self: &Arc<Self>) {
         self.wake_task();
     }
 }

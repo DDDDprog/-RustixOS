@@ -1,7 +1,30 @@
-use volatile::Volatile;
 use core::fmt;
+use core::ptr;
 use lazy_static::lazy_static;
 use spin::Mutex;
+
+/// A volatile wrapper for Copy types using inline assembly for volatile access
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+struct Volatile<T: Copy> {
+    value: T,
+}
+
+impl<T: Copy> Volatile<T> {
+    fn new(value: T) -> Self {
+        Volatile { value }
+    }
+    
+    fn read(&self) -> T {
+        // Use volatile read - prevents optimization
+        unsafe { ptr::read_volatile(&self.value) }
+    }
+    
+    fn write(&mut self, value: T) {
+        // Use volatile write - prevents optimization
+        unsafe { ptr::write_volatile(&mut self.value, value) };
+    }
+}
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

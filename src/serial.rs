@@ -10,14 +10,26 @@ lazy_static! {
     };
 }
 
+pub fn init() {
+    // Serial is initialized lazily via lazy_static
+    // Just access it to ensure it's initialized
+    let _ = &*SERIAL1;
+}
+
 #[doc(hidden)]
 pub fn _print(args: ::core::fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
 
-    interrupts::without_interrupts(|| {
-        SERIAL1.lock().write_fmt(args).expect("Printing to serial failed");
-    });
+    // Use without_interrupts only if interrupts are enabled
+    if interrupts::are_enabled() {
+        interrupts::without_interrupts(|| {
+            SERIAL1.lock().write_fmt(args).expect("Printing to serial failed");
+        });
+    } else {
+        // Early boot - just try to write
+        let _ = SERIAL1.lock().write_fmt(args);
+    }
 }
 
 #[macro_export]

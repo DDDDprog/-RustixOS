@@ -1,11 +1,12 @@
 use x86_64::{
     structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, Page, PageTable, PhysFrame,
-        Size4KiB, UnusedPhysFrame,
+        FrameAllocator, Mapper, Page, PageTable, PhysFrame,
+        Size4KiB,
     },
     PhysAddr, VirtAddr,
 };
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use alloc::{boxed::Box, vec::Vec};
+use crate::bootloader::bootinfo::MemoryRegionType;
 
 pub unsafe fn init(physical_memory_offset: VirtAddr) -> impl Mapper<Size4KiB> {
     let level_4_table = active_level_4_table(physical_memory_offset);
@@ -26,39 +27,96 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)
     &mut *page_table_ptr
 }
 
+
 use x86_64::structures::paging::OffsetPageTable;
 
 pub struct BootInfoFrameAllocator {
-    memory_map: &'static MemoryMap,
+    usable_frames: &'static [x86_64::structures::paging::PhysFrame],
     next: usize,
 }
 
 impl BootInfoFrameAllocator {
-    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+    /// Create frame allocator with default memory map
+    pub unsafe fn init_default() -> Self {
+        use crate::bootloader::bootinfo::MemoryRegionType;
+        
+        let mut frames = Vec::new();
+        
+        // Default memory regions similar to what a bootloader would provide
+        let regions = [
+            (0x0, 0xA0000, MemoryRegionType::Reserved),      // BIOS area
+            (0xA0000, 0xC0000, MemoryRegionType::Reserved),  // VGA VRAM
+            (0xC0000, 0x100000, MemoryRegionType::Reserved), // ROM area
+            (0x100000, 0x10000000, MemoryRegionType::Usable), // 1MB - 256MB
+        ];
+        
+        for (start, end, region_type) in regions.iter() {
+            if *region_type == MemoryRegionType::Usable {
+                let mut addr = *start;
+                while addr < *end {
+                    frames.push(PhysFrame::containing_address(PhysAddr::new(addr)));
+                    addr += 4096;
+                }
+            }
+        }
+        
+        let frames_box = frames.into_boxed_slice();
+        let frames_ptr = frames_box.as_ptr();
+        let len = frames_box.len();
+        
+        Box::leak(frames_box);
+        
+        let usable_frames = core::slice::from_raw_parts(frames_ptr, len);
+        
         BootInfoFrameAllocator {
-            memory_map,
+            usable_frames,
             next: 0,
         }
     }
-
-    fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
-        let regions = self.memory_map.iter();
-        let usable_regions = regions
-            .filter(|r| r.region_type == MemoryRegionType::Usable);
-        let addr_ranges = usable_regions
-            .map(|r| r.range.start_addr()..r.range.end_addr());
-        let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
-        frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
+    
+    pub unsafe fn init(memory_map: &crate::bootloader::bootinfo::MemoryMap) -> Self {
+        let mut frames = Vec::new();
+        
+        for region in memory_map.iter() {
+            if region.region_type == MemoryRegionType::Usable {
+                let start_addr = (region.start / 4096) * 4096;
+                let end_addr = (region.end / 4096) * 4096;
+                
+                let mut addr = start_addr;
+                while addr < end_addr {
+                    frames.push(PhysFrame::containing_address(PhysAddr::new(addr)));
+                    addr += 4096;
+                }
+            }
+        }
+        
+        let frames_box = frames.into_boxed_slice();
+        let frames_ptr = frames_box.as_ptr();
+        let len = frames_box.len();
+        
+        Box::leak(frames_box);
+        
+        let usable_frames = core::slice::from_raw_parts(frames_ptr, len);
+        
+        BootInfoFrameAllocator {
+            usable_frames,
+            next: 0,
+        }
     }
 }
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
-    fn allocate_frame(&mut self) -> Option<UnusedPhysFrame> {
-        let frame = self.usable_frames().nth(self.next);
-        self.next += 1;
-        frame.map(|f| unsafe { UnusedPhysFrame::new(f) })
+    fn allocate_frame(&mut self) -> Option<PhysFrame> {
+        if self.next < self.usable_frames.len() {
+            let frame = self.usable_frames[self.next];
+            self.next += 1;
+            Some(frame)
+        } else {
+            None
+        }
     }
 }
+
 
 pub fn create_example_mapping(
     page: Page,

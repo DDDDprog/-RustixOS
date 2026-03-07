@@ -3,10 +3,16 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
+#![feature(alloc_error_handler)]
+#![feature(abi_x86_interrupt)]
 
 extern crate alloc;
+extern crate multiboot;
 
-use bootloader::{BootInfo, entry_point};
+mod bootloader;
+mod boot;
+
+use multiboot::information::Multiboot;
 use core::panic::PanicInfo;
 
 mod vga_buffer;
@@ -23,57 +29,62 @@ mod syscalls;
 
 entry_point!(kernel_main);
 
-fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use memory::BootInfoFrameAllocator;
-    use x86_64::VirtAddr;
-
+fn kernel_main(_boot_info: *const Multiboot) -> ! {
+    // Full kernel initialization
     println!("RustixOS - Advanced Rust Kernel v0.1.0");
     println!("========================================");
 
     // Initialize GDT
     gdt::init();
+    println!("GDT initialized");
     
     // Initialize interrupts
     interrupts::init_idt();
+    println!("IDT initialized");
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
+    println!("Interrupts enabled");
 
-    // Initialize memory management
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    // Initialize memory management with default values
+    let phys_mem_offset = x86_64::VirtAddr::new(0xFFFF_FFE0_0000_0000);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    
+    // Create frame allocator using default memory map
     let mut frame_allocator = unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map)
+        memory::BootInfoFrameAllocator::init_default()
     };
 
     // Initialize heap allocator
     allocator::init_heap(&mut mapper, &mut frame_allocator)
         .expect("heap initialization failed");
+    println!("Heap initialized");
 
     // Initialize filesystem
     filesystem::init();
+    println!("Filesystem initialized");
 
     // Initialize process management
     process::init();
+    println!("Process initialized");
 
     // Initialize system calls
     syscalls::init();
+    println!("Syscalls initialized");
 
     println!("Kernel initialization complete!");
-    println!("Starting shell...");
-
+    println!("Starting kernel loop...");
+    
     // Start the main kernel loop
     kernel_loop();
 }
 
 fn kernel_loop() -> ! {
-    use task::Task;
-    use task::simple_executor::SimpleExecutor;
-    use task::keyboard;
-
-    let mut executor = SimpleExecutor::new();
-    executor.spawn(Task::new(example_task()));
-    executor.spawn(Task::new(keyboard::print_keypresses()));
-    executor.run();
+    println!("Kernel running...");
+    
+    // Simple idle loop
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 async fn async_number() -> u32 {

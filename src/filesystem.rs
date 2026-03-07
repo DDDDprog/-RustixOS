@@ -2,6 +2,7 @@ use alloc::{
     collections::BTreeMap,
     string::{String, ToString},
     vec::Vec,
+    format,
 };
 use spin::Mutex;
 use lazy_static::lazy_static;

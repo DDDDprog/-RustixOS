@@ -1,5 +1,4 @@
-use alloc::alloc::{GlobalAlloc, Layout};
-use core::ptr::null_mut;
+use alloc::alloc::Layout;
 use linked_list_allocator::LockedHeap;
 use x86_64::{
     structures::paging::{
@@ -35,81 +34,13 @@ pub fn init_heap(
     }
 
     unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+        ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
     }
 
     Ok(())
 }
 
-pub struct Dummy;
-
-unsafe impl GlobalAlloc for Dummy {
-    unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        null_mut()
-    }
-
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        panic!("dealloc should be never called")
-    }
-}
-
 #[alloc_error_handler]
-fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+fn alloc_error_handler(layout: Layout) -> ! {
     panic!("allocation error: {:?}", layout)
-}
-
-pub struct BumpAllocator {
-    heap_start: usize,
-    heap_end: usize,
-    next: usize,
-    allocations: usize,
-}
-
-impl BumpAllocator {
-    pub const fn new() -> Self {
-        BumpAllocator {
-            heap_start: 0,
-            heap_end: 0,
-            next: 0,
-            allocations: 0,
-        }
-    }
-
-    pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
-        self.heap_start = heap_start;
-        self.heap_end = heap_start + heap_size;
-        self.next = heap_start;
-    }
-}
-
-unsafe impl GlobalAlloc for spin::Mutex<BumpAllocator> {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let mut bump = self.lock();
-
-        let alloc_start = align_up(bump.next, layout.align());
-        let alloc_end = match alloc_start.checked_add(layout.size()) {
-            Some(end) => end,
-            None => return null_mut(),
-        };
-
-        if alloc_end > bump.heap_end {
-            null_mut()
-        } else {
-            bump.next = alloc_end;
-            bump.allocations += 1;
-            alloc_start as *mut u8
-        }
-    }
-
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        let mut bump = self.lock();
-        bump.allocations -= 1;
-        if bump.allocations == 0 {
-            bump.next = bump.heap_start;
-        }
-    }
-}
-
-fn align_up(addr: usize, align: usize) -> usize {
-    (addr + align - 1) & !(align - 1)
 }
