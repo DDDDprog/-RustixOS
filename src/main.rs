@@ -30,20 +30,24 @@ mod syscalls;
 entry_point!(kernel_main);
 
 fn kernel_main(_boot_info: *const Multiboot) -> ! {
+    // Use early boot print before any initialization
+    boot::early_print("RustixOS v0.1.0 - Booting...\n");
+    
+    // Initialize GDT first (required for any segment operations)
+    gdt::init();
+    boot::early_print("GDT OK\n");
+    
+    // Initialize interrupts
+    interrupts::init_idt();
+    boot::early_print("IDT OK\n");
+    unsafe { interrupts::PICS.lock().initialize() };
+    x86_64::instructions::interrupts::enable();
+    boot::early_print("IRQs OK\n");
+
     // Full kernel initialization
     println!("RustixOS - Advanced Rust Kernel v0.1.0");
     println!("========================================");
 
-    // Initialize GDT
-    gdt::init();
-    println!("GDT initialized");
-    
-    // Initialize interrupts
-    interrupts::init_idt();
-    println!("IDT initialized");
-    unsafe { interrupts::PICS.lock().initialize() };
-    x86_64::instructions::interrupts::enable();
-    println!("Interrupts enabled");
 
     // Initialize memory management with default values
     let phys_mem_offset = x86_64::VirtAddr::new(0xFFFF_FFE0_0000_0000);
