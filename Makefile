@@ -32,10 +32,10 @@ else
 endif
 
 # Cross-compilation toolchains
-CC_x86_64 := x86_64-elf-gcc
-LD_x86_64 := x86_64-elf-ld
-OBJCOPY_x86_64 := x86_64-elf-objcopy
-OBJDUMP_x86_64 := x86_64-elf-objdump
+CC_x86_64 := gcc
+LD_x86_64 := ld
+OBJCOPY_x86_64 := objcopy
+OBJDUMP_x86_64 := objdump
 
 CC_x86 := i686-elf-gcc
 LD_x86 := i686-elf-ld
@@ -65,23 +65,27 @@ KERNEL_IMG := $(BUILD_DIR)/kernel-$(ARCH).img
 ISO_FILE := $(BUILD_DIR)/$(PROJECT_NAME)-$(ARCH).iso
 
 # Assembly source files
-ASM_SOURCES_x86_64 := src/boot/multiboot_header.asm src/arch/x86_64/boot.s src/arch/x86_64/interrupt.s
-ASM_SOURCES_x86 := src/boot/multiboot_header.asm src/arch/x86/boot.s src/arch/x86/interrupt.s
-ASM_SOURCES_arm := src/arch/arm/boot.s src/arch/arm/vectors.s
-ASM_SOURCES_aarch64 := src/arch/aarch64/boot.s src/arch/aarch64/vectors.s
+ASM_SOURCES_x86_64 := 
+ASM_SOURCES_x86 := 
+ASM_SOURCES_arm := 
+ASM_SOURCES_aarch64 := src/arch/aarch64/boot/boot.s
 
 ASM_SOURCES := $(ASM_SOURCES_$(ARCH))
 ASM_OBJECTS := $(patsubst src/%.asm,target/%.o,$(patsubst src/%.s,target/%.o,$(ASM_SOURCES)))
 
 # Assembly build rules
+target/boot/multiboot_header.o: src/boot/multiboot_header.asm | target/boot
+	@mkdir -p target/boot
+	@nasm -f elf64 $< -o $@
+
 target/%.o: src/%.asm | target
-	@$(CC) -c $< -o $@
+	@nasm -f elf64 $< -o $@
 
 target/%.o: src/%.s | target
 	@$(CC) -c $< -o $@
 
 target:
-	@mkdir -p target
+	@mkdir -p target target/boot
 
 # Linker scripts
 LINKER_SCRIPT_x86_64 := linker.ld
@@ -167,7 +171,7 @@ $(BUILD_DIR):
 
 # Build Rust kernel
 .PHONY: rust-kernel
-rust-kernel: validate-arch
+rust-kernel: validate-arch target/boot/multiboot_header.o
 	@echo "$(BLUE)Building Rust kernel for $(ARCH)...$(NC)"
 	@RUSTFLAGS="$(RUSTFLAGS)" cargo build $(CARGO_FLAGS)
 
@@ -191,7 +195,6 @@ $(KERNEL_IMG): $(KERNEL_ELF)
 .PHONY: kernel
 kernel: target/x86_64-unknown-none/debug/kernel
 	@echo "$(GREEN)Kernel built successfully for x86_64!$(NC)"
-	@$(OBJDUMP) -h $< | head -20
 
 # Build for all architectures
 .PHONY: all-archs

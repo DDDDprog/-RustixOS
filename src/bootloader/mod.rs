@@ -124,9 +124,9 @@ impl Default for MemoryMap {
 macro_rules! entry_point {
     ($path:path) => {
         #[export_name = "_start"]
+        #[allow(unused)]
         extern "C" fn _start() -> ! {
             // Call the kernel main - it needs to handle its own boot_info
-            // For now, we pass a null pointer and the kernel should handle this case
             $path(core::ptr::null());
             loop {}
         }

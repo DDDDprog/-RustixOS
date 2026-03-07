@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["RustixOS Team"]
 
+[build]
+target = "x86_64-unknown-none"
+
 [dependencies]
 spin = "0.9"
 x86_64 = "0.14"
@@ -34,3 +37,6 @@ bench = false
 [target.x86_64-unknown-none.dependencies]
 multiboot = { version = "0.8.0", default-features = false }
 uart_16550 = "0.2"
+
+[build-dependencies]
+bootloader = "0.11.15"
