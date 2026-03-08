@@ -1,7 +1,8 @@
 //! Minimal bootloader API stubs for building without the full bootloader crate
 
-
 extern crate alloc;
+
+use multiboot::information::Multiboot;
 
 /// Boot information passed from bootloader to kernel
 #[derive(Debug)]
@@ -34,12 +35,12 @@ impl MemoryRegion {
     pub fn start_addr(&self) -> u64 {
         self.start
     }
-    
+
     /// Get the end address
     pub fn end_addr(&self) -> u64 {
         self.end
     }
-    
+
     /// Get the range of addresses
     pub fn range(&self) -> Range<u64> {
         self.start..self.end
@@ -49,9 +50,9 @@ impl MemoryRegion {
 /// Type of memory region
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryRegionType {
-    /// Usable RAM
+    /// Memory available for use
     Usable,
-    /// Reserved memory (not usable)
+    /// Reserved memory
     Reserved,
     /// ACPI reclaimable memory
     AcpiReclaimable,
@@ -67,11 +68,10 @@ pub enum MemoryRegionType {
     Kernel,
 }
 
-/// Range type alias
 pub type Range<T> = core::ops::Range<T>;
 
-/// Memory map
-#[derive(Debug)]
+/// Memory map structure
+#[derive(Debug, Clone)]
 pub struct MemoryMap {
     regions: &'static [MemoryRegion],
 }
@@ -79,30 +79,20 @@ pub struct MemoryMap {
 impl MemoryMap {
     /// Create a new memory map with default usable memory regions
     pub const fn new() -> Self {
-        // Inline static regions
-        const REGIONS: [MemoryRegion; 4] = [
+        // Default memory map with some basic usable regions
+        const REGIONS: [MemoryRegion; 2] = [
             MemoryRegion {
-                region_type: MemoryRegionType::Reserved,
-                start: 0x0,
-                end: 0xA0000,
-            },
-            MemoryRegion {
-                region_type: MemoryRegionType::Reserved,
-                start: 0xA0000,
-                end: 0xC0000,
-            },
-            MemoryRegion {
-                region_type: MemoryRegionType::Reserved,
-                start: 0xC0000,
-                end: 0x100000,
+                region_type: MemoryRegionType::Usable,
+                start: 0,
+                end: 0x100000, // 1 MB
             },
             MemoryRegion {
                 region_type: MemoryRegionType::Usable,
                 start: 0x100000,
-                end: 0x10000000,
+                end: 0x10000000, // 16 MB
             },
         ];
-        
+
         Self { regions: &REGIONS }
     }
 
@@ -118,15 +108,37 @@ impl Default for MemoryMap {
     }
 }
 
-/// Entry point macro for the kernel
+// Early print function - inline assembly to print to VGA
+pub fn early_print(s: &str) {
+    unsafe {
+        let vga = 0xB8000u64 as *mut u8;
+        let mut pos = 0usize;
+        
+        for byte in s.bytes() {
+            if byte == b'\n' {
+                pos = ((pos / 80) + 1) * 80;
+            } else {
+                vga.offset((pos * 2) as isize).write_volatile(byte);
+                vga.offset((pos * 2 + 1) as isize).write_volatile(0x0Bu8);
+                pos += 1;
+            }
+        }
+    }
+}
+
+/// Entry point macro for the kernel - just passes the raw pointer from GRUB
 #[macro_export]
 macro_rules! entry_point {
     ($path:path) => {
         #[export_name = "_start"]
         #[allow(unused)]
-        extern "C" fn _start() -> ! {
-            // Call the kernel main - it needs to handle its own boot_info
-            $path(core::ptr::null());
+        extern "C" fn _start(boot_info_ptr: usize) -> ! {
+            // Early debug print
+            crate::bootloader::early_print("RustixOS: _start reached\n");
+            
+            // Pass the raw pointer to kernel_main
+            // The kernel will cast it as needed
+            $path(boot_info_ptr as *const _);
             loop {}
         }
     };

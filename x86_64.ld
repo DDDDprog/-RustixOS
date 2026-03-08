@@ -1,36 +1,33 @@
+/* Linker script for RustixOS kernel with multiboot2 header */
 OUTPUT_FORMAT("elf64-x86-64")
 OUTPUT_ARCH("i386:x86-64")
-ENTRY(_start)
+ENTRY("_start")
 
 SECTIONS
 {
-    /* Multiboot header at virtual address 0x1000 (within first 8KB) */
-    . = 0x1000;
+    . = 1M;
 
-    .multiboot : {
-        KEEP(*(.multiboot))
+    /* Multiboot2 header must be in first 32KiB and aligned to 8 bytes */
+    .multiboot_header : {
+        *(.multiboot_header)
     }
 
-    /* Rest of kernel at 1MB - where multiboot loads us */
-    . = 0x100000;
-    
     .text : {
         *(.text)
     }
-    
+
     .rodata : {
         *(.rodata)
     }
-    
+
     .data : {
         *(.data)
     }
-    
+
     .bss : {
         *(.bss)
-        *(. COMMON)
     }
-    
+
     /DISCARD/ : {
         *(.note.GNU-stack)
         *(.eh_frame)

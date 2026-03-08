@@ -14,11 +14,13 @@ linked_list_allocator = "0.10"
 conquer-once = { version = "0.2", default-features = false }
 crossbeam-queue = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
-bootloader = "0.10.0"
 
 [dependencies.lazy_static]
 version = "1.4"
 features = ["spin_no_std"]
+
+[target.x86_64-unknown-none.dependencies]
+multiboot = { version = "0.8.0", default-features = false }
 
 [profile.dev]
 panic = "abort"
@@ -31,9 +33,3 @@ name = "kernel"
 path = "src/main.rs"
 test = false
 bench = false
-
-[target.x86_64-unknown-none.dependencies]
-multiboot = { version = "0.8.0", default-features = false }
-
-[package.metadata.bootloader]
-target = "x86_64-unknown-none"
