@@ -11,9 +11,9 @@ cargo build --target x86_64-unknown-none
 KERNEL_ELF="target/x86_64-unknown-none/debug/kernel"
 ISO_FILE="build/rustixos.iso"
 
-# Try grub-mkrescue first
+# Create ISO with GRUB
 if command -v grub-mkrescue &> /dev/null; then
-    echo "Creating ISO with grub-mkrescue..."
+    echo "Creating ISO..."
     mkdir -p build/iso/boot/grub
     cp "$KERNEL_ELF" build/iso/boot/kernel.elf
     cat > build/iso/boot/grub/grub.cfg << 'GRUB'
@@ -23,31 +23,9 @@ menuentry "RustixOS" {
     multiboot /boot/kernel.elf
 }
 GRUB
-    grub-mkrescue -o "$ISO_FILE" build/iso/ 2>/dev/null || grub-mkrescue -o "$ISO_FILE" build/iso/
-    echo "Running QEMU..."
-    qemu-system-x86_64 -m 256 -display none -serial stdio -cdrom "$ISO_FILE"
-    exit 0
+    grub-mkrescue -o "$ISO_FILE" build/iso/ 2>/dev/null || true
 fi
 
-# Try xorriso
-if command -v xorriso &> /dev/null; then
-    echo "Creating ISO with xorriso..."
-    mkdir -p build/iso/boot/grub
-    cp "$KERNEL_ELF" build/iso/boot/kernel.elf
-    cat > build/iso/boot/grub/grub.cfg << 'GRUB'
-set default=0
-set timeout=0
-menuentry "RustixOS" {
-    multiboot /boot/kernel.elf
-}
-GRUB
-    xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid RUSTIXOS -output "$ISO_FILE" build/iso/
-    echo "Running QEMU..."
-    qemu-system-x86_64 -m 256 -display none -serial stdio -cdrom "$ISO_FILE"
-    exit 0
-fi
-
-# Fallback: try direct boot
-echo "No ISO tools found, trying direct boot..."
-qemu-system-x86_64 -m 256 -display none -serial stdio -kernel "$KERNEL_ELF" 2>/dev/null || \
-qemu-system-x86_64 -m 256 -display none -serial stdio -cdrom "$KERNEL_ELF"
+echo "Running QEMU with graphical display..."
+# Show graphical window + serial output
+qemu-system-x86_64 -m 256 -serial stdio -cdrom "$ISO_FILE"
