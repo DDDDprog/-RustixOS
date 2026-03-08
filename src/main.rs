@@ -49,66 +49,48 @@ mod syscalls;
 
 entry_point!(kernel_main);
 
+
 fn kernel_main(_boot_info: *const Multiboot) -> ! {
-    // Use early boot print before any initialization
-    boot::early_print("RustixOS v0.1.0 - Booting...\n");
-    
+    boot::early_print("RustixOS v0.1.0\nBooting...\n");
+
     #[cfg(target_arch = "x86_64")]
     {
-        // Initialize GDT first (required for any segment operations)
+        boot::early_print("GDT...\n");
         gdt::init();
-        boot::early_print("GDT OK\n");
         
-        // Initialize interrupts
+        boot::early_print("IDT...\n");
         interrupts::init_idt();
-        boot::early_print("IDT OK\n");
+        
+        boot::early_print("PIC...\n");
         unsafe { interrupts::PICS.lock().initialize() };
         x86_64::instructions::interrupts::enable();
-        boot::early_print("IRQs OK\n");
-
-        // Full kernel initialization
-        println!("RustixOS - Advanced Rust Kernel v0.1.0");
-        println!("========================================");
-
-
-        // Initialize memory management with default values
+        
+        boot::early_print("Mem...\n");
         let phys_mem_offset = x86_64::VirtAddr::new(0xFFFF_FFE0_0000_0000);
         let mut mapper = unsafe { memory::init(phys_mem_offset) };
-        
-        // Create frame allocator using default memory map
-        let mut frame_allocator = unsafe {
-            memory::BootInfoFrameAllocator::init_default()
-        };
+        let mut frame_allocator = unsafe { memory::BootInfoFrameAllocator::init_default() };
 
-        // Initialize heap allocator
+        boot::early_print("Heap...\n");
         allocator::init_heap(&mut mapper, &mut frame_allocator)
-            .expect("heap initialization failed");
-        println!("Heap initialized");
+            .expect("heap init failed");
 
-        // Initialize filesystem
+        boot::early_print("FS...\n");
         filesystem::init();
-        println!("Filesystem initialized");
 
-        // Initialize process management
-        process::init();
-        println!("Process initialized");
-
-        // Initialize system calls
-        syscalls::init();
-        println!("Syscalls initialized");
+        boot::early_print("All OK!\n");
+        
+        println!("\n\n=== RustixOS v0.1.0 ===");
+        println!("All systems initialized!");
+        
+        loop {
+            x86_64::instructions::hlt();
+        }
     }
 
     #[cfg(not(target_arch = "x86_64"))]
     {
-        println!("RustixOS - Non-x86_64 Architecture");
-        println!("Basic initialization complete");
+        loop { }
     }
-
-    println!("Kernel initialization complete!");
-    println!("Starting kernel loop...");
-    
-    // Start the main kernel loop
-    kernel_loop();
 }
 
 #[cfg(target_arch = "x86_64")]
